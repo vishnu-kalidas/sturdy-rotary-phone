@@ -35,13 +35,12 @@ jobs:
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           context-github: ${{ toJson(github) }}
           job-name: 'create_change_request'
-          # All change fields go inside `change-request`, not `change-request-details`
           change-request: >
             {
+              "type": "Normal",
               "short_description": "Automated pipeline deployment",
               "description": "Deploying main branch updates to production.",
               "priority": "3",
-              "assignment_group": "Change Management",
               "implementation_plan": "Automated deployment via GitHub Actions pipeline.",
               "backout_plan": "Re-deploy previous release artifact.",
               "test_plan": "Post-deployment smoke tests executed by pipeline."
