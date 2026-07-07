@@ -88,36 +88,37 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # (Optional) Run tests and SonarQube quality checks here
+      - name: Run Unit Tests
+        run: echo "Executing test suites..."
 
-  register_change_details:
+  create_change_request:
     needs: build_and_test
     runs-on: ubuntu-latest
     steps:
-      - name: Register ServiceNow DevOps Change Attributes
+      - name: ServiceNow DevOps Change Request
         uses: ServiceNow/servicenow-devops-change@v4.1.0
         with:
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          job-name: 'Deploy to Production' # Must match the exact job name below
           context-github: ${{ toJSON(github) }}
+          # Must exactly match the job key that is being gated, below
+          job-name: 'deploy_to_production'
           change-request: >
             {
-              "attributes": {
-                "short_description": "Automated deployment from GitHub Actions",
-                "description": "Deploying main branch updates.",
-                "justification": "Required for application updates.",
-                "chg_model": "DevOps"
-              }
+              "type": "Normal",
+              "short_description": "Automated deployment from GitHub Actions",
+              "description": "Deploying main branch updates.",
+              "priority": "3",
+              "implementation_plan": "Automated deployment via GitHub Actions pipeline.",
+              "backout_plan": "Re-deploy previous release artifact.",
+              "test_plan": "Post-deployment smoke tests executed by pipeline."
             }
 
   deploy_to_production:
-    needs: register_change_details
+    needs: create_change_request
     runs-on: ubuntu-latest
-    # environment: 'prod' # Triggers the Deployment Protection Rule / Gate
+    environment: prod   # Required — triggers the Deployment Protection Rule in SN
     steps:
       - name: Execute Deployment
-        run: |
-          echo "Change Request approved! Deploying artifacts..."
-
+        run: echo "Change approved! Deploying artifacts to production..."
