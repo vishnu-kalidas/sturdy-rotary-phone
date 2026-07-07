@@ -75,7 +75,6 @@
 
 #       - name: Execute Deployment
 #         run: echo "Deploying artifacts to production environment..."
-
 name: CI/CD Pipeline with ServiceNow DevOps Change Control
 
 on:
