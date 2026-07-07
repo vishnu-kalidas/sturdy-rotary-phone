@@ -102,7 +102,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           job-name: 'Deploy to Production' # Must match the exact job name below
           context-github: ${{ toJSON(github) }}
-          change-request-by-custom-data: >
+          change-request: >
             {
               "attributes": {
                 "short_description": "Automated deployment from GitHub Actions",
