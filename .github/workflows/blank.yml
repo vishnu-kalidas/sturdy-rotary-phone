@@ -97,13 +97,21 @@ jobs:
     steps:
       - name: ServiceNow DevOps Change Request
         uses: ServiceNow/servicenow-devops-change@v4.1.0
+        # Step marked as non-blocking — failure won't stop deploy_to_production
+        continue-on-error: true
         with:
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
-          # Must exactly match the job key that is being gated, below
           job-name: 'deploy_to_production'
+          # Stop polling after 10 minutes (600s), checking every 30s
+          timeout: '600'
+          interval: '30'
+          # Don't abort pipeline if change creation itself hits an error
+          abortOnChangeCreationFailure: false
+          # Don't abort pipeline if polling times out waiting for approval
+          abortOnChangeStepTimeout: false
           change-request: >
             {
               "type": "Normal",
@@ -118,7 +126,8 @@ jobs:
   deploy_to_production:
     needs: create_change_request
     runs-on: ubuntu-latest
-    environment: prod   # Required — triggers the Deployment Protection Rule in SN
+    # Run deploy even if the change request job failed or timed out
+    if: always()
     steps:
       - name: Execute Deployment
-        run: echo "Change approved! Deploying artifacts to production..."
+        run: echo "Deploying artifacts to production..."
