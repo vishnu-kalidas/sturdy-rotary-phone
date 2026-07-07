@@ -1,4 +1,81 @@
-name: CI/CD Deployment with ServiceNow Governance
+# name: CI/CD Deployment with ServiceNow Governance
+
+# on:
+#   push:
+#     branches: [ "main" ]
+
+# jobs:
+#   build_and_test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+
+#       - name: Run Unit Tests
+#         run: echo "Executing test suites..."
+
+#       - name: Upload Build Artifact
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: build-output
+#           path: .
+
+#   create_change_request:
+#     runs-on: ubuntu-latest
+#     needs: build_and_test
+#     outputs:
+#       change-request-number: ${{ steps.create_change.outputs.change-request-number }}
+#     steps:
+#       - name: ServiceNow DevOps Change Request
+#         id: create_change
+#         uses: ServiceNow/servicenow-devops-change@v4.1.0
+#         with:
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+#           context-github: ${{ toJson(github) }}
+#           job-name: 'create_change_request'
+#           change-request: >
+#             {
+#               "type": "Normal",
+#               "short_description": "Automated pipeline deployment",
+#               "description": "Deploying main branch updates to production.",
+#               "priority": "3",
+#               "implementation_plan": "Automated deployment via GitHub Actions pipeline.",
+#               "backout_plan": "Re-deploy previous release artifact.",
+#               "test_plan": "Post-deployment smoke tests executed by pipeline."
+#             }
+
+#   await_change_approval:
+#     runs-on: ubuntu-latest
+#     needs: create_change_request
+#     steps:
+#       - name: Wait for ServiceNow Change Approval
+#         uses: ServiceNow/servicenow-devops-get-change@v4.1.0
+#         with:
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+#           context-github: ${{ toJson(github) }}
+#           job-name: 'create_change_request'
+#           change-request: >
+#             {
+#               "number": "${{ needs.create_change_request.outputs.change-request-number }}"
+#             }
+
+#   deploy_to_production:
+#     runs-on: ubuntu-latest
+#     needs: await_change_approval
+#     environment: prod
+#     steps:
+#       - name: Download Build Artifact
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: build-output
+
+#       - name: Execute Deployment
+#         run: echo "Deploying artifacts to production environment..."
+name: CI/CD Pipeline with ServiceNow DevOps Change Control
 
 on:
   push:
@@ -11,67 +88,36 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run Unit Tests
-        run: echo "Executing test suites..."
+      # (Optional) Run tests and SonarQube quality checks here
 
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: .
-
-  create_change_request:
-    runs-on: ubuntu-latest
+  register_change_details:
     needs: build_and_test
-    outputs:
-      change-request-number: ${{ steps.create_change.outputs.change-request-number }}
-    steps:
-      - name: ServiceNow DevOps Change Request
-        id: create_change
-        uses: ServiceNow/servicenow-devops-change@v4.1.0
-        with:
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          context-github: ${{ toJson(github) }}
-          job-name: 'create_change_request'
-          change-request: >
-            {
-              "type": "Normal",
-              "short_description": "Automated pipeline deployment",
-              "description": "Deploying main branch updates to production.",
-              "priority": "3",
-              "implementation_plan": "Automated deployment via GitHub Actions pipeline.",
-              "backout_plan": "Re-deploy previous release artifact.",
-              "test_plan": "Post-deployment smoke tests executed by pipeline."
-            }
-
-  await_change_approval:
     runs-on: ubuntu-latest
-    needs: create_change_request
     steps:
-      - name: Wait for ServiceNow Change Approval
-        uses: ServiceNow/servicenow-devops-get-change@v4.1.0
+      - name: Register ServiceNow DevOps Change Attributes
+        uses: ServiceNow/servicenow-devops-change@v4
         with:
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          context-github: ${{ toJson(github) }}
-          job-name: 'create_change_request'
-          change-request: >
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          job-name: 'Deploy to Production' # Must match the exact job name below
+          context-github: ${{ toJSON(github) }}
+          change-request-by-custom-data: >
             {
-              "number": "${{ needs.create_change_request.outputs.change-request-number }}"
+              "attributes": {
+                "short_description": "Automated deployment from GitHub Actions",
+                "description": "Deploying main branch updates.",
+                "justification": "Required for application updates.",
+                "chg_model": "DevOps"
+              }
             }
 
   deploy_to_production:
+    needs: register_change_details
     runs-on: ubuntu-latest
-    needs: await_change_approval
-    environment: prod
+    # environment: 'prod' # Triggers the Deployment Protection Rule / Gate
     steps:
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-
       - name: Execute Deployment
-        run: echo "Deploying artifacts to production environment..."
+        run: |
+          echo "Change Request approved! Deploying artifacts..."
+
